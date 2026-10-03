@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class ApiEndpoints {
   /// Django API base URL.
@@ -6,6 +6,9 @@ class ApiEndpoints {
   /// On Flutter Web the page host (`localhost` vs `127.0.0.1`) must match the
   /// API host. Browsers treat those as different sites, so a session cookie set
   /// on one is not sent to the other — causing 401 after a successful login.
+  ///
+  /// On Android emulators, `localhost` points to the device itself, not the host
+  /// machine. Use `10.0.2.2` so the app reaches the local Django server.
   static String get baseUrl {
     if (kIsWeb) {
       final host = Uri.base.host;
@@ -13,7 +16,9 @@ class ApiEndpoints {
         return 'http://$host:8000';
       }
     }
-    // Android emulator: http://10.0.2.2:8000
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000';
+    }
     // iOS simulator / desktop / same machine:
     return 'http://localhost:8000';
   }

@@ -65,9 +65,12 @@ HTTP `POST /api/push/` :
 1. Machine résolue via `machine_id` ; le message est ignoré si absente.
 2. Séance `en cours` requise pour la machine (sinon message ignoré).
 3. `LiveMeasurement` créé.
-4. Alertes `monitoring.Alerte` générées via `check_thresholds()` (dédupliquées
-   sur 5 minutes).
-5. Alertes `seances.Alert` générées via `analyser_mesure()` (même déduplication).
+4. Une évaluation unique est réalisée via `analyser_mesure()`, en utilisant
+   les seuils de la séance lorsqu'ils sont disponibles, avec les valeurs par
+   défaut sinon.
+5. Le résultat est persisté dans les deux modèles historiques
+   (`monitoring.Alerte` et `seances.Alert`) pour préserver leurs consommateurs
+   existants (déduplication sur 5 minutes).
 
 ## Endpoints complémentaires (HTTP, même RASPI)
 

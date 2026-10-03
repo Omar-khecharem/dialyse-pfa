@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load icons %}
+{% block title %}Supprimer l'Infirmier{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+  <div class="bg-white p-6 rounded-xl border shadow-sm text-center space-y-6">
+    <div class="w-16 h-16 mx-auto rounded-full bg-red-100 flex items-center justify-center">
+      {% icon "alert-triangle" cls="h-8 w-8 text-red-600" %}
+    </div>
+
+    <div>
+      <h2 class="text-xl font-semibold text-gray-900">Supprimer l'infirmier</h2>
+      <p class="text-gray-600 mt-2">
+        Êtes-vous sûr de vouloir supprimer <strong class="text-gray-900">{{ nurse.username }}</strong> ?
+        Cette action est irréversible.
+      </p>
+    </div>
+
+    <div class="bg-gray-50 rounded-lg p-4 text-left space-y-2">
+      <p class="text-sm text-gray-600"><strong>Email :</strong> {{ nurse.email }}</p>
+      <p class="text-sm text-gray-600"><strong>Téléphone :</strong> {{ nurse.phone_number|default:"Non renseigné" }}</p>
+    </div>
+
+    <form method="post" class="flex gap-3">
+      {% csrf_token %}
+      <a href="{% url 'accounts:nurse_profile' nurse.id %}"
+         class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 text-center text-gray-700">
+        Annuler
+      </a>
+      <button type="submit" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+        {% icon "trash2" cls="h-4 w-4 inline-block mr-2" %}
+        Confirmer la suppression
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

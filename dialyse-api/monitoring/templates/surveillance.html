@@ -1,0 +1,1047 @@
+{% extends "base.html" %}
+{% load static %}
+{% load icons %}
+
+{% block title %}
+Surveillance en temps réel
+{% endblock %}
+
+{% block content %}
+
+<div class="space-y-6">
+
+<!-- ================= HEADER ================= -->
+
+<div class="flex items-center justify-between">
+
+    <div>
+
+        <h2 class="text-2xl font-bold">
+            Surveillance en Temps Réel
+        </h2>
+
+        <p
+            id="last-update"
+            class="text-sm text-gray-500 mt-1">
+
+            Dernière mise à jour : --
+
+        </p>
+
+    </div>
+
+    <div class="
+        flex
+        items-center
+        gap-2
+        bg-green-50
+        border
+        border-green-300
+        rounded-xl
+        px-4
+        py-2">
+
+        <div class="
+            w-3
+            h-3
+            rounded-full
+            bg-green-500
+            animate-pulse">
+        </div>
+
+        <span class="font-semibold text-green-700">
+
+            Connexion active
+
+        </span>
+
+    </div>
+
+</div>
+
+<!-- ================= KPIs ================= -->
+
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5">
+
+<div class="bg-white rounded-xl shadow border p-5">
+
+    <p class="text-gray-500 text-sm">
+        Sessions actives
+    </p>
+
+    <h2
+        id="sessions-count"
+        class="text-3xl font-bold mt-2">
+
+        0
+
+    </h2>
+
+</div>
+
+<div class="bg-white rounded-xl shadow border p-5">
+
+    <p class="text-gray-500 text-sm">
+        Machines
+    </p>
+
+    <h2
+        id="machines-count"
+        class="text-3xl font-bold mt-2">
+
+        0
+
+    </h2>
+
+</div>
+
+<div class="bg-white rounded-xl shadow border p-5">
+
+    <p class="text-gray-500 text-sm">
+        Alertes critiques
+    </p>
+
+    <h2
+        id="critical-alerts"
+        class="text-3xl font-bold text-red-600 mt-2">
+
+        0
+
+    </h2>
+
+</div>
+
+<div class="bg-white rounded-xl shadow border p-5">
+
+    <p class="text-gray-500 text-sm">
+        Avertissements
+    </p>
+
+    <h2
+        id="warning-alerts"
+        class="text-3xl font-bold text-yellow-500 mt-2">
+
+        0
+
+    </h2>
+
+</div>
+
+<div class="bg-white rounded-xl shadow border p-5">
+
+    <p class="text-gray-500 text-sm">
+        Patients stables
+    </p>
+
+    <h2
+        id="stable-patients"
+        class="text-3xl font-bold text-green-600 mt-2">
+
+        0
+
+    </h2>
+
+</div>
+
+</div>
+
+<!-- ================= CONTENT ================= -->
+
+<div class="grid grid-cols-1 gap-6">
+
+<!-- LEFT -->
+
+<div>
+
+<h2 class="font-bold text-xl mb-4">
+
+Patients en surveillance
+
+</h2>
+
+<div
+    id="sessions-container"
+    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 min-w-0">
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- ALERTES (below patients) -->
+
+<div class="mt-6">
+
+<div class="flex items-center justify-between mb-4">
+
+<h2 class="font-bold text-xl">
+
+Alertes
+
+</h2>
+
+<button
+    id="stopAlarm"
+    class="
+    bg-red-600
+    text-white
+    px-4
+    py-2
+    rounded-lg
+    hover:bg-red-700">
+
+🔇 Stop Alarme
+
+</button>
+
+</div>
+
+<div
+    id="alerts-container"
+    class="space-y-4">
+
+</div>
+
+</div>
+
+<script>
+
+let previousAlerts = new Set();
+
+let alarm =
+new Audio("{% static 'sounds/alert.mp3' %}");
+
+alarm.loop = true;
+
+let alarmPlaying = false;
+// ===============================
+// LOAD LIVE DATA
+// ===============================
+
+function loadLiveData(){
+
+    fetch("/api/real-monitoring/")
+
+    .then(response => response.json())
+
+    .then(data => {
+
+
+        console.log("LIVE:", data);
+
+
+
+        let sessions = [];
+let alerts = data.alerts || [];
+
+
+if(data.measurements && data.measurements.length > 0){
+
+    let latestBySession = {};
+
+    data.measurements.forEach(function(m){
+
+        let key = m.seance_id || m.machine_id || m.machine;
+
+        if(!key){
+            return;
+        }
+
+        let current = latestBySession[key];
+
+        if(!current){
+            latestBySession[key] = m;
+            return;
+        }
+
+        let mt = m.timestamp || m.time || "";
+        let ct = current.timestamp || current.time || "";
+
+        if(mt > ct){
+            latestBySession[key] = m;
+        }
+
+    });
+
+    Object.keys(latestBySession).forEach(function(key){
+
+        let m = latestBySession[key];
+
+        sessions.push({
+
+            patient:m.patient,
+
+            machine:m.machine,
+
+            Qb:m.Qb,
+
+            PA:m.PA,
+
+            PTM:m.PTM,
+
+            PV:m.PV,
+
+            UF:m.UF
+
+        });
+
+    });
+
+}
+
+
+
+        // ===============================
+        // UPDATE KPI
+        // ===============================
+
+
+        document.getElementById(
+            "sessions-count"
+        ).textContent = sessions.length;
+
+
+        document.getElementById(
+            "machines-count"
+        ).textContent = sessions.length;
+
+
+
+        let critical = alerts.filter(
+            a => a.niveau === "HIGH"
+        ).length;
+
+
+        let warning = alerts.filter(
+            a => a.niveau === "MEDIUM"
+        ).length;
+
+
+
+        document.getElementById(
+            "critical-alerts"
+        ).textContent = critical;
+
+
+
+        document.getElementById(
+            "warning-alerts"
+        ).textContent = warning;
+
+
+
+        document.getElementById(
+            "stable-patients"
+        ).textContent =
+        sessions.length - critical;
+
+
+
+        document.getElementById(
+            "last-update"
+        ).textContent =
+        "Dernière mise à jour : "
+        +
+        new Date().toLocaleTimeString();
+
+
+
+
+        // ===============================
+        // DISPLAY SESSIONS
+        // ===============================
+
+
+        let sessionContainer =
+        document.getElementById(
+            "sessions-container"
+        );
+
+
+        sessionContainer.innerHTML="";
+
+
+
+        if(sessions.length === 0){
+
+
+            sessionContainer.innerHTML = `
+
+            <div class="
+            bg-white
+            border
+            rounded-xl
+            p-5
+            min-w-0
+            overflow-hidden
+            text-center
+            text-gray-500">
+
+            Aucune séance active
+
+            </div>
+
+            `;
+
+
+        }
+
+
+        sessions.forEach(session=>{
+
+
+            sessionContainer.innerHTML += `
+
+            <div class="
+            bg-white
+            border
+            rounded-xl
+            shadow
+            p-5
+            min-w-0
+            overflow-hidden">
+
+
+                <h3 class="
+                text-lg
+                font-bold
+                mb-3
+                truncate">
+
+                Patient :
+                ${session.patient}
+
+                </h3>
+
+
+
+                <p class="truncate">
+                Machine :
+                <b>
+                ${session.machine}
+                </b>
+                </p>
+
+
+                <hr class="my-3">
+
+
+
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+
+
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Débit sang</span>
+                        <b>${session.Qb ?? "--"} ml/min</b>
+                    </div>
+
+
+
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">PA</span>
+                        <b>${session.PA ?? "--"} mmHg</b>
+                    </div>
+
+
+
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">PTM</span>
+                        <b>${session.PTM ?? "--"} mmHg</b>
+                    </div>
+
+
+
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">PV</span>
+                        <b>${session.PV ?? "--"} mmHg</b>
+                    </div>
+
+
+
+                    <div class="flex justify-between col-span-2">
+                        <span class="text-gray-500">Volume UF</span>
+                        <b>${session.UF ?? "--"} ml</b>
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+
+            `;
+
+
+        });
+
+
+
+
+
+        // ===============================
+        // DISPLAY ALERTS
+        // ===============================
+
+
+        let alertContainer =
+        document.getElementById(
+            "alerts-container"
+        );
+
+
+        alertContainer.innerHTML="";
+
+
+
+        alerts.forEach(alert=>{
+
+
+            notifyAlert(alert);
+
+
+
+            let color =
+            "border-yellow-300 bg-yellow-50";
+
+
+            let text =
+            "text-yellow-700";
+
+
+
+            if(alert.niveau === "HIGH"){
+
+
+                color =
+                "border-red-400 bg-red-50";
+
+
+                text =
+                "text-red-700";
+
+
+            }
+
+
+
+            alertContainer.innerHTML += `
+
+
+            <div class="
+            ${color}
+            border-2
+            rounded-xl
+            p-4">
+
+
+                <div class="
+                flex
+                justify-between">
+
+
+                    <b class="${text}">
+                    ${alert.niveau}
+                    </b>
+
+
+
+                    <span class="
+                    text-xs
+                    text-gray-500">
+
+                    ${
+                    new Date(
+                    alert.time
+                    )
+                    .toLocaleTimeString()
+                    }
+
+                    </span>
+
+
+                </div>
+
+
+
+                <p class="mt-2">
+
+                ${alert.message}
+
+                </p>
+
+
+
+                <button
+onclick="ackAlert('${alert.id}')"
+class="
+mt-3
+px-3
+py-1
+text-xs
+bg-white
+border
+rounded
+hover:bg-gray-100
+">
+
+Acquitter
+
+</button>
+
+
+            </div>
+
+
+            `;
+
+
+        });
+
+
+
+    })
+
+
+
+    .catch(error=>{
+
+
+        console.log(
+            "Erreur live:",
+            error
+        );
+
+
+    });
+
+
+}
+// ===============================
+// ALERT SYSTEM
+// ===============================
+
+
+function notifyAlert(alert){
+
+
+    const key =
+    alert.niveau +
+    alert.message +
+    alert.time;
+
+
+
+    // منع تكرار نفس التنبيه
+    if(previousAlerts.has(key)){
+
+        return;
+
+    }
+
+
+    previousAlerts.add(key);
+
+
+
+
+    if(alert.niveau === "HIGH"){
+
+
+        startAlarm();
+
+
+
+        showPopup(
+            "🚨 Alerte critique",
+            alert.message,
+            "red"
+        );
+
+
+    }
+
+
+
+    else if(alert.niveau === "MEDIUM"){
+
+
+        showPopup(
+            "⚠️ Attention",
+            alert.message,
+            "yellow"
+        );
+
+
+    }
+
+
+
+    else{
+
+
+        showPopup(
+            "ℹ️ Information",
+            alert.message,
+            "blue"
+        );
+
+
+    }
+
+
+}
+
+
+
+
+
+
+// ===============================
+// START SOUND
+// ===============================
+
+
+function startAlarm(){
+
+
+    if(!alarmPlaying){
+
+
+        alarm.play()
+
+        .then(()=>{
+
+
+            alarmPlaying=true;
+
+
+        })
+
+        .catch(error=>{
+
+
+            console.log(
+                "Audio blocked:",
+                error
+            );
+
+
+        });
+
+
+    }
+
+
+}
+
+
+
+
+
+
+// ===============================
+// STOP SOUND BUTTON
+// ===============================
+
+
+document
+.getElementById("stopAlarm")
+.addEventListener(
+"click",
+function(){
+
+
+    alarm.pause();
+
+
+    alarm.currentTime = 0;
+
+
+    alarmPlaying=false;
+
+
+
+});
+
+
+
+
+
+
+
+// ===============================
+// POPUP NOTIFICATION
+// ===============================
+
+
+function showPopup(
+    title,
+    message,
+    color
+){
+
+
+
+    const box =
+    document.createElement(
+        "div"
+    );
+
+
+
+    box.className = `
+
+    fixed
+
+    top-5
+
+    right-5
+
+    z-50
+
+    bg-white
+
+    border-2
+
+    border-${color}-500
+
+    shadow-xl
+
+    rounded-xl
+
+    p-5
+
+    w-80
+
+    `;
+
+
+
+
+    box.innerHTML = `
+
+
+    <h3 class="
+    font-bold
+    text-${color}-600">
+
+
+        ${title}
+
+
+    </h3>
+
+
+
+    <p class="
+    mt-2
+    text-sm">
+
+
+        ${message}
+
+
+    </p>
+
+
+
+    `;
+
+
+
+    document.body.appendChild(box);
+
+
+
+
+    setTimeout(()=>{
+
+
+        box.remove();
+
+
+    },5000);
+
+
+
+}
+
+
+
+
+
+
+
+// ===============================
+// ACQUITTER ALERT
+// ===============================
+
+
+function acquitAlert(button){
+
+
+    let card =
+    button.closest(
+        "div.border-2"
+    );
+
+
+
+    if(card){
+
+
+        card.style.opacity="0.5";
+
+
+        button.textContent =
+        "Acquittée";
+
+
+        button.disabled=true;
+
+
+    }
+
+
+
+}
+
+
+
+
+
+
+
+// ===============================
+// INITIAL LOAD
+// ===============================
+
+
+loadLiveData();
+
+
+
+
+
+
+// Refresh automatique كل 3 ثواني
+
+setInterval(
+    loadLiveData,
+    3000
+);
+
+
+function ackAlert(id){
+
+
+    fetch(
+        `/api/alerts/${id}/ack/`,
+        {
+            method:"POST",
+
+            headers:{
+                "X-CSRFToken": getCookie("csrftoken")
+            }
+        }
+    )
+
+
+    .then(response => response.json())
+
+
+    .then(data=>{
+
+
+        console.log(
+            "Alert ACK:",
+            data
+        );
+
+
+        loadLiveData();
+
+
+    })
+
+
+    .catch(error=>{
+
+        console.log(error);
+
+    });
+
+
+}
+function resolveAlert(id){
+
+    fetch(
+        `/api/alerts/${id}/resolve/`,
+        {
+            method:"POST",
+
+            headers:{
+                "X-CSRFToken": getCookie("csrftoken")
+            }
+        }
+    )
+
+    .then(response => response.json())
+
+    .then(data=>{
+
+        console.log(
+            "Alert RESOLVED:",
+            data
+        );
+
+        loadLiveData();
+
+    })
+
+    .catch(error=>{
+
+        console.log(error);
+
+    });
+
+}
+function getCookie(name) {
+
+    let cookieValue = null;
+
+    if (document.cookie && document.cookie !== "") {
+
+        const cookies =
+        document.cookie.split(";");
+
+
+        for (let i = 0; i < cookies.length; i++) {
+
+            const cookie =
+            cookies[i].trim();
+
+
+            if(cookie.substring(0,name.length+1)
+            === (name+"=")){
+
+                cookieValue =
+                decodeURIComponent(
+                    cookie.substring(name.length+1)
+                );
+
+                break;
+            }
+        }
+    }
+
+    return cookieValue;
+}
+</script>
+
+
+{% endblock %}
